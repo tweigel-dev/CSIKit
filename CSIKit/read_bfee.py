@@ -5,9 +5,11 @@ from math import floor
 
 from .csitools import scale_timestamps, scale_csi_entry
 from .errors import print_length_error
-
+from .legacy import netlink
 import numpy as np
 import scipy.io
+
+import traceback
 
 SIZE_STRUCT = struct.Struct(">H").unpack
 CODE_STRUCT = struct.Struct("B").unpack
@@ -129,6 +131,31 @@ class IWLBeamformReader:
 
         return csi_block
 
+    def read_log(self, callback):
+        """
+            this function sniffs the udp stream at realtime and fit the entrys into the callback if one receives.
+            Don't fit callback with a time intensive task. It could cause buffer overflow or skipping entrys.
+            To stop the realtime sniffing raise an Exeption.
+            Parameters:
+                callback (function): Funktion that is called per CSIEntry callback(csiEntry)  
+        """
+        print("start listening to logs at realtime")
+        sock = netlink.open_socket()
+        while True:
+            try:
+                payload = netlink.recv_from_socket(sock)
+                print("received Entry")
+                csiEntry = self.read_bf_entry(payload)
+                callback(csiEntry)
+            except OSError as e:
+                print(f"error while receiving CSI-Entry:")
+                traceback.print_exc()
+            except Exception as e:
+                print(f"manual stopped realtime capturing")
+                traceback.print_exc()
+                break
+
+
     def read_bf_entry(self, data):
         """
             This function parses a CSI payload not associated with a file (for example: those extracted via netlink).
@@ -139,7 +166,7 @@ class IWLBeamformReader:
             Returns:
                 csi_block (dict): Individual parsed CSI block.
         """
-
+        print(len(data))
         csi_header = struct.unpack("<LHHBBBBBbBBHH", data[4:25])
         all_data = [x[0] for x in struct.Struct(">B").iter_unpack(data[25:])]
 

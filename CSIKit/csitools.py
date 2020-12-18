@@ -43,9 +43,10 @@ def get_timestamps(trace, relative=True):
     return list([x[key] for x in trace])
 
 def get_total_rss(rssi_a, rssi_b, rssi_c, agc):
-    # Calculates the Received Signal Strength (RSS) in dBm
-    # Careful here: rssis could be zero
-
+    """
+        Calculates the Received Signal Strength (RSS) in dBm
+        Careful here: rssis could be zero
+    """
     rssi_mag = 0
     if rssi_a != 0:
         rssi_mag = rssi_mag + dbinv(rssi_a)
@@ -58,6 +59,20 @@ def get_total_rss(rssi_a, rssi_b, rssi_c, agc):
     #This is consistent with Linux 802.11n CSI Tool's MATLAB implementation.
     #As seen in get_total_rss.m.
     return db(rssi_mag, "pow") - 44 - agc
+ 
+def get_snr(entry):
+    """
+    calculates the snr of an entry and returns it
+    """
+    if not ("rssi_a" in entry and "rssi_b" in entry and "rssi_c" in entry and "agc" in entry):
+        raise Exception("invalid entry rssi or agc is missing")
+    if not ("noise" in entry):
+        raise Exception("missing noise at entry")  
+
+    rss_dBm = get_total_rss(entry["rssi_a"],entry["rssi_b"],entry["rssi_c"],entry["agc"])
+    noise_dBm = entry["noise"]
+    snr_dB = rss_dBm - noise_dBm 
+    return snr_dB
 
 def scale_csi_entry(frame):
     """
